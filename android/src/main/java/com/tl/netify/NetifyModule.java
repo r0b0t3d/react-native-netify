@@ -42,16 +42,12 @@ public class NetifyModule extends ReactContextBaseJavaModule {
         String url = params.getString("url");
         String methodString = params.hasKey("method") ? params.getString("method") : "get";
         NetifyMethod method = NetifyMethod.valueOf(methodString.toUpperCase());
-        ReadableMap headersMap = params.getMap("headers");
+        ReadableMap headersMap = params.hasKey("headers") ? params.getMap("headers") : null;
         Map<String, String> headers = convertMap(headersMap);
         ReadableMap bodyMap = params.hasKey("body") ? params.getMap("body") : null;
-        JSONObject body = new JSONObject();
+        Map<String, String> body = null;
         if (bodyMap != null) {
-            try {
-                body = convertMapToJson(bodyMap);
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
+            body = convertMap(bodyMap);
         }
         switch (method) {
             case GET:
