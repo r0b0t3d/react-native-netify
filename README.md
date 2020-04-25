@@ -1,17 +1,32 @@
 # react-native-netify
 
+Native networking library for react native. Use [AFNetworking](https://github.com/AFNetworking/AFNetworking) for iOS and [FastAndroidNetworking](https://github.com/amitshekhariitbhu/Fast-Android-Networking) for Android.
+
 ## Getting started
 
-`$ npm install react-native-netify --save`
-
-### Mostly automatic installation
-
-`$ react-native link react-native-netify`
+`$ yarn add react-native-netify`
 
 ## Usage
+
 ```javascript
 import Netify from 'react-native-netify';
 
-// TODO: What to do with the module?
-Netify;
+// Init module
+Netify.init({
+    // Set timeout for request
+    timeout: 60,
+});
+
+Netify.jsonRequest({
+    url: apiUrl,
+    method: 'post',
+    headers: {
+        'Content-Type': 'application/json'
+    },
+    body: {
+        name: userName,
+    }
+})
+.then(response => console.log(response))
+.catch(error => console.log(error));
 ```

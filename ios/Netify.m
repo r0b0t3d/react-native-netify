@@ -4,9 +4,16 @@
 #import <React/RCTConvert.h>
 #import "RCTConvert+NetifyMethod.m"
 
-@implementation Netify
+@implementation Netify {
+  NSUInteger timeout;
+}
 
 RCT_EXPORT_MODULE()
+
+RCT_EXPORT_METHOD(init:(NSDictionary*)params)
+{
+  timeout = [RCTConvert NSInteger:params[@"timeout"]];
+}
 
 RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
                   resolve:(RCTPromiseResolveBlock)resolve
@@ -73,6 +80,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
 
 - (AFJSONRequestSerializer*)buildRequest:(NSDictionary*) params {
   AFJSONRequestSerializer* request = [AFJSONRequestSerializer serializer];
+  [request setTimeoutInterval:timeout];
   NSDictionary* headers = [RCTConvert NSDictionary:params[@"headers"]];
   if (headers != nil) {
     for (NSString* key in headers) {

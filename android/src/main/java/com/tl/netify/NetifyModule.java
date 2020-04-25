@@ -22,6 +22,9 @@ import org.json.JSONObject;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
+
+import okhttp3.OkHttpClient;
 
 public class NetifyModule extends ReactContextBaseJavaModule {
     private final ReactApplicationContext reactContext;
@@ -29,12 +32,22 @@ public class NetifyModule extends ReactContextBaseJavaModule {
     public NetifyModule(ReactApplicationContext reactContext) {
         super(reactContext);
         this.reactContext = reactContext;
-        initializeNetworking();
     }
 
     @Override
     public String getName() {
         return "Netify";
+    }
+
+    @ReactMethod
+    public void init(ReadableMap params) {
+        int timeout = params.hasKey("timeout") ? params.getInt("timeout") : 60;
+        OkHttpClient okHttpClient = new OkHttpClient().newBuilder()
+                .connectTimeout(timeout, TimeUnit.SECONDS)
+                .readTimeout(timeout, TimeUnit.SECONDS)
+                .writeTimeout(timeout, TimeUnit.SECONDS)
+                .build();
+        AndroidNetworking.initialize(reactContext.getApplicationContext(), okHttpClient);
     }
 
     @ReactMethod
@@ -229,9 +242,5 @@ public class NetifyModule extends ReactContextBaseJavaModule {
             }
         }
         return array;
-    }
-
-    private void initializeNetworking() {
-        AndroidNetworking.initialize(reactContext.getApplicationContext());
     }
 }
