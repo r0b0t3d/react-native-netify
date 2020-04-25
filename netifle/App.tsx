@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-use-before-define */
 /**
  * Sample React Native App
  *
@@ -8,9 +9,13 @@
  * https://github.com/facebook/react-native
  */
 
-import React, {Component, useState} from 'react';
-import {Platform, StyleSheet, Text, View, TouchableOpacity} from 'react-native';
+import React, {useState} from 'react';
+import {StyleSheet, Text, View, TouchableOpacity} from 'react-native';
 import Netify from 'react-native-netify';
+
+Netify.init({
+  timeout: 60,
+});
 
 export default function App() {
   const [response, setResponse] = useState('');
@@ -54,7 +59,9 @@ export default function App() {
         <Text>POST request</Text>
       </TouchableOpacity>
       <Text style={styles.welcome}>☆ Response ☆</Text>
-      <Text style={styles.instructions} numberOfLines={5}>{response}</Text>
+      <Text style={styles.instructions} numberOfLines={5}>
+        {response}
+      </Text>
     </View>
   );
 }
@@ -79,6 +86,6 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: 'green',
     padding: 10,
-    margin: 15
-  }
+    margin: 15,
+  },
 });

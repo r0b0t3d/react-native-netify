@@ -5,14 +5,14 @@
 #import "RCTConvert+NetifyMethod.m"
 
 @implementation Netify {
-  NSUInteger timeout;
+  int timeout;
 }
 
 RCT_EXPORT_MODULE()
 
 RCT_EXPORT_METHOD(init:(NSDictionary*)params)
 {
-  timeout = [RCTConvert NSInteger:params[@"timeout"]];
+  timeout = [RCTConvert int:params[@"timeout"]];
 }
 
 RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
