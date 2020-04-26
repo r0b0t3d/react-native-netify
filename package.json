@@ -54,6 +54,7 @@
   "files": [
     "lib/**/*",
     "android/**/*",
-    "ios/**/*"
+    "ios/**/*",
+    "*.podspec"
   ]
 }
