@@ -27,9 +27,11 @@ export default function App() {
       headers: {
         'Content-Type': 'application/json',
       },
-    }).then((response) => {
-      setResponse(JSON.stringify(response));
-    });
+    })
+      .then((response) => {
+        setResponse(JSON.stringify(response));
+      })
+      .catch(handleError);
   }
 
   function handlePostRequest() {
@@ -44,9 +46,18 @@ export default function App() {
         salary: '123',
         age: '23',
       },
-    }).then((response) => {
-      setResponse(JSON.stringify(response));
-    });
+    })
+      .then((response) => {
+        setResponse(JSON.stringify(response));
+      })
+      .catch(handleError);
+  }
+
+  function handleError(error: any) {
+    const {
+      response: {status, headers, data},
+    } = error;
+    console.log(status, headers, data);
   }
 
   return (
