@@ -31,7 +31,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       [manager GET:url parameters:nil progress:nil success:^(NSURLSessionTask *task, id responseObject) {
         resolve(responseObject);
       } failure:^(NSURLSessionTask *operation, NSError *error) {
-        [self handleError:error rejecter:reject];
+        [self handleError:operation withError:error rejecter:reject];
       }];
       break;
     }
@@ -39,7 +39,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       [manager POST:url parameters:body progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         resolve(responseObject);
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:error rejecter:reject];
+        [self handleError:task withError:error rejecter:reject];
       }];
       break;
     }
@@ -47,7 +47,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       [manager DELETE:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         resolve(responseObject);
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:error rejecter:reject];
+        [self handleError:task withError:error rejecter:reject];
       }];
       break;
     }
@@ -55,7 +55,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       [manager PATCH:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         resolve(responseObject);
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:error rejecter:reject];
+        [self handleError:task withError:error rejecter:reject];
       }];
       break;
     }
@@ -63,7 +63,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       [manager PUT:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
         resolve(responseObject);
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:error rejecter:reject];
+        [self handleError:task withError:error rejecter:reject];
       }];
       break;
     }
@@ -72,10 +72,38 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
   }
 }
 
-- (void)handleError:(NSError*)error rejecter:(RCTPromiseRejectBlock)reject {
-  NSString* errResponse = [[NSString alloc] initWithData:(NSData *)error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey] encoding:NSUTF8StringEncoding];
-  NSLog(@"%@",errResponse);
-  reject(@"", errResponse, error);
+- (void)handleError:(NSURLSessionTask*)task withError:(NSError*)error rejecter:(RCTPromiseRejectBlock)reject {
+  NSString* code;
+  NSString* message = error.localizedDescription;
+  switch (error.code) {
+    case -1004:
+      code = @"network_error";
+      break;
+      
+    default:
+      code = [@(error.code) stringValue];
+      break;
+  }
+  if (task != nil && [task.response isKindOfClass:[NSHTTPURLResponse class]]) {
+    NSInteger statusCode = ((NSHTTPURLResponse*)task.response).statusCode;
+    id response = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
+    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:response
+                                                                 options:NSJSONReadingAllowFragments
+                                                                   error:nil];
+    NSDictionary* headers = ((NSHTTPURLResponse*)task.response).allHeaderFields;
+    NSMutableDictionary *userInfo = [error.userInfo mutableCopy];
+    userInfo[@"response"] = @{
+      @"status": @(statusCode),
+      @"headers": headers,
+      @"data": json
+    };
+    NSError* newError = [NSError errorWithDomain:error.domain
+                                code:error.code
+                            userInfo:userInfo];
+    reject(code, message, newError);
+    return;
+  }
+  reject(code, message, error);
 }
 
 - (AFJSONRequestSerializer*)buildRequest:(NSDictionary*) params {
@@ -92,5 +120,3 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
 }
 
 @end
-
-
