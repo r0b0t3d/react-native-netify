@@ -2,7 +2,7 @@
   "name": "react-native-netify",
   "title": "React Native Netify",
   "version": "0.0.5",
-  "description": "TODO",
+  "description": "Native networking for react native",
   "main": "lib/index.js",
   "scripts": {
     "format": "prettier --write \"src/**/*.ts\"",
