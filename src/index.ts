@@ -17,7 +17,9 @@ function init(params?: Config) {
 
 async function jsonRequest(params: JsonRequestParams) {
   try {
-    return await Netify.jsonRequest(params);
+    let { url } = params;
+    url = url.replace(/([^:])(\/\/+)/g, '$1/');
+    return Netify.jsonRequest({ ...params, url });
   } catch (error) {
     if (isIos) {
       handleIosError(error);
