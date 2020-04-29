@@ -4,6 +4,34 @@
 #import <React/RCTConvert.h>
 #import "RCTConvert+NetifyMethod.m"
 
+@interface NetifyJSONRequestSerializer : AFJSONRequestSerializer
+
+@property (nonatomic, assign) NSTimeInterval timeout;
+- (id)initWithTimeout:(NSTimeInterval)timeout;
+
+@end
+
+@implementation NetifyJSONRequestSerializer
+- (id)initWithTimeout:(NSTimeInterval)timeout {
+  self = [super init];
+  if (self) {
+    self.timeout = timeout;
+  }
+  return self;
+}
+
+- (NSMutableURLRequest *)requestWithMethod:(NSString *)method URLString:(NSString *)URLString parameters:(id)parameters error:(NSError * _Nullable __autoreleasing *)error {
+  NSMutableURLRequest *request = [super requestWithMethod:method URLString:URLString parameters:parameters error:error];
+  
+  if (self.timeout > 0) {
+    [request setTimeoutInterval:self.timeout];
+  }
+  return request;
+  
+}
+
+@end
+
 @implementation Netify {
   int timeout;
 }
@@ -12,7 +40,7 @@ RCT_EXPORT_MODULE()
 
 RCT_EXPORT_METHOD(init:(NSDictionary*)params)
 {
-  timeout = [RCTConvert int:params[@"timeout"]];
+  timeout = [RCTConvert int:params[@"timeout"]] ?: 60;
 }
 
 RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
@@ -21,11 +49,12 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
 {
   NSString* url = [RCTConvert NSString:params[@"url"]];
   NSDictionary* body = [RCTConvert NSDictionary:params[@"body"]];
-  NetifyMethod method = [RCTConvert NetifyMethod:params[@"method"]];
+  NSString* method = [RCTConvert NSString:params[@"method"]];
+  NSDictionary* headers = [RCTConvert NSDictionary:params[@"headers"]];
   AFHTTPSessionManager *manager = [AFHTTPSessionManager manager];
   manager.responseSerializer = [AFJSONResponseSerializer serializer];
   manager.responseSerializer.acceptableContentTypes = nil;
-  manager.requestSerializer = [self buildRequest:params];
+  manager.requestSerializer = [[NetifyJSONRequestSerializer alloc] initWithTimeout:timeout];
   
   // Tell application keep executing the request in background for amout of time
   UIApplication *application = [UIApplication sharedApplication];
@@ -35,50 +64,24 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
     [application endBackgroundTask:bgTask];
     bgTask = UIBackgroundTaskInvalid;
   }];
-  switch (method) {
-    case GET: {
-      [manager GET:url parameters:nil progress:nil success:^(NSURLSessionTask *task, id responseObject) {
-        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
-      } failure:^(NSURLSessionTask *operation, NSError *error) {
-        [self handleError:operation withError:error bgTask:bgTask rejecter:reject];
-      }];
-      break;
-    }
-    case POST: {
-      [manager POST:url parameters:body progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
-      } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
-      }];
-      break;
-    }
-    case DELETE: {
-      [manager DELETE:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
-      } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
-      }];
-      break;
-    }
-    case PATCH: {
-      [manager PATCH:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
-      } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
-      }];
-      break;
-    }
-    case PUT: {
-      [manager PUT:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
-      } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
-      }];
-      break;
-    }
-    default:
-      break;
+  
+  NSURLSessionDataTask *dataTask = [manager dataTaskWithHTTPMethod:[method uppercaseString]
+                                                         URLString:url
+                                                        parameters:body
+                                                           headers:headers
+                                                    uploadProgress:^(NSProgress * _Nonnull uploadProgress) {
+    NSLog(@"uploadProgress %lld", uploadProgress.totalUnitCount / uploadProgress.completedUnitCount);
   }
+                                                  downloadProgress:^(NSProgress * _Nonnull downloadProgress) {
+    NSLog(@"downloadProgress %lld", downloadProgress.totalUnitCount / downloadProgress.completedUnitCount);
+  }
+                                                           success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
+    [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
+  }
+                                                           failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
+    [self handleError:task withError:error bgTask:bgTask rejecter:reject];
+  }];
+  [dataTask resume];
 }
 
 - (void)handleResponse:(id)responseObject bgTask:(UIBackgroundTaskIdentifier)bgTask resolver:(RCTPromiseResolveBlock)resolve {
@@ -102,7 +105,9 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
     case -1004:
       code = @"network_error";
       break;
-      
+    case -1001:
+      code = @"timeout";
+      break;
     default:
       code = [@(error.code) stringValue];
       break;
@@ -110,15 +115,18 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
   if (task != nil && [task.response isKindOfClass:[NSHTTPURLResponse class]]) {
     NSInteger statusCode = ((NSHTTPURLResponse*)task.response).statusCode;
     id response = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
-    NSDictionary *json = [NSJSONSerialization JSONObjectWithData:response
-                                                         options:NSJSONReadingAllowFragments
-                                                           error:nil];
+    NSDictionary *json;
+    if (response) {
+      [NSJSONSerialization JSONObjectWithData:response
+                                      options:NSJSONReadingAllowFragments
+                                        error:nil];
+    }
     NSDictionary* headers = ((NSHTTPURLResponse*)task.response).allHeaderFields;
     NSMutableDictionary *userInfo = [error.userInfo mutableCopy];
     userInfo[@"response"] = @{
       @"status": @(statusCode),
       @"headers": headers,
-      @"data": json
+      @"data": json ?: [NSNull null]
     };
     NSError* newError = [NSError errorWithDomain:error.domain
                                             code:error.code
@@ -127,19 +135,6 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
     return;
   }
   reject(code, message, error);
-}
-
-- (AFJSONRequestSerializer*)buildRequest:(NSDictionary*) params {
-  AFJSONRequestSerializer* request = [AFJSONRequestSerializer serializer];
-  [request setTimeoutInterval:timeout];
-  NSDictionary* headers = [RCTConvert NSDictionary:params[@"headers"]];
-  if (headers != nil) {
-    for (NSString* key in headers) {
-      NSString* value = [RCTConvert NSString:headers[key]];
-      [request setValue:value forHTTPHeaderField:key];
-    }
-  }
-  return request;
 }
 
 @end
