@@ -1,7 +1,7 @@
 {
   "name": "react-native-netify",
   "title": "React Native Netify",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Native networking for react native",
   "main": "lib/index.js",
   "scripts": {
