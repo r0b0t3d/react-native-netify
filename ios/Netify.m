@@ -26,44 +26,53 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
   manager.responseSerializer = [AFJSONResponseSerializer serializer];
   manager.responseSerializer.acceptableContentTypes = nil;
   manager.requestSerializer = [self buildRequest:params];
+  
+  // Tell application keep executing the request in background for amout of time
+  UIApplication *application = [UIApplication sharedApplication];
+  __block UIBackgroundTaskIdentifier bgTask = [application beginBackgroundTaskWithName:@"jsonRequest" expirationHandler:^{
+    // Clean up any unfinished task business by marking where you
+    // stopped or ending the task outright.
+    [application endBackgroundTask:bgTask];
+    bgTask = UIBackgroundTaskInvalid;
+  }];
   switch (method) {
     case GET: {
       [manager GET:url parameters:nil progress:nil success:^(NSURLSessionTask *task, id responseObject) {
-        resolve(responseObject);
+        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
       } failure:^(NSURLSessionTask *operation, NSError *error) {
-        [self handleError:operation withError:error rejecter:reject];
+        [self handleError:operation withError:error bgTask:bgTask rejecter:reject];
       }];
       break;
     }
     case POST: {
       [manager POST:url parameters:body progress:nil success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        resolve(responseObject);
+        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error rejecter:reject];
+        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
       }];
       break;
     }
     case DELETE: {
       [manager DELETE:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        resolve(responseObject);
+        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error rejecter:reject];
+        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
       }];
       break;
     }
     case PATCH: {
       [manager PATCH:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        resolve(responseObject);
+        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error rejecter:reject];
+        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
       }];
       break;
     }
     case PUT: {
       [manager PUT:url parameters:body success:^(NSURLSessionDataTask * _Nonnull task, id  _Nullable responseObject) {
-        resolve(responseObject);
+        [self handleResponse:responseObject bgTask:bgTask resolver:resolve];
       } failure:^(NSURLSessionDataTask * _Nullable task, NSError * _Nonnull error) {
-        [self handleError:task withError:error rejecter:reject];
+        [self handleError:task withError:error bgTask:bgTask rejecter:reject];
       }];
       break;
     }
@@ -72,7 +81,21 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
   }
 }
 
-- (void)handleError:(NSURLSessionTask*)task withError:(NSError*)error rejecter:(RCTPromiseRejectBlock)reject {
+- (void)handleResponse:(id)responseObject bgTask:(UIBackgroundTaskIdentifier)bgTask resolver:(RCTPromiseResolveBlock)resolve {
+  if (bgTask != UIBackgroundTaskInvalid) {
+    UIApplication *application = [UIApplication sharedApplication];
+    [application endBackgroundTask:bgTask];
+    bgTask = UIBackgroundTaskInvalid;
+  }
+  resolve(responseObject);
+}
+
+- (void)handleError:(NSURLSessionTask*)task withError:(NSError*)error bgTask:(UIBackgroundTaskIdentifier)bgTask rejecter:(RCTPromiseRejectBlock)reject {
+  if (bgTask != UIBackgroundTaskInvalid) {
+    UIApplication *application = [UIApplication sharedApplication];
+    [application endBackgroundTask:bgTask];
+    bgTask = UIBackgroundTaskInvalid;
+  }
   NSString* code;
   NSString* message = error.localizedDescription;
   switch (error.code) {
@@ -88,8 +111,8 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
     NSInteger statusCode = ((NSHTTPURLResponse*)task.response).statusCode;
     id response = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
     NSDictionary *json = [NSJSONSerialization JSONObjectWithData:response
-                                                                 options:NSJSONReadingAllowFragments
-                                                                   error:nil];
+                                                         options:NSJSONReadingAllowFragments
+                                                           error:nil];
     NSDictionary* headers = ((NSHTTPURLResponse*)task.response).allHeaderFields;
     NSMutableDictionary *userInfo = [error.userInfo mutableCopy];
     userInfo[@"response"] = @{
@@ -98,8 +121,8 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
       @"data": json
     };
     NSError* newError = [NSError errorWithDomain:error.domain
-                                code:error.code
-                            userInfo:userInfo];
+                                            code:error.code
+                                        userInfo:userInfo];
     reject(code, message, newError);
     return;
   }
