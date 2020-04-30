@@ -14,7 +14,7 @@ import Netify from 'react-native-netify';
 // Init module
 Netify.init({
     // Set timeout for request
-    timeout: 60,
+    timeout: 60000,
 });
 
 Netify.jsonRequest({
@@ -28,5 +28,8 @@ Netify.jsonRequest({
     }
 })
 .then(response => console.log(response))
-.catch(error => console.log(error));
+.catch(error => {
+    const { code, message, response } = error;
+    console.log(code, message, response);
+});
 ```

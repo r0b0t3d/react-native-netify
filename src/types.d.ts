@@ -1,4 +1,7 @@
 type Config = {
+  /**
+   * Set timeout for request in milliseconds
+   */
   timeout?: number;
 };
 

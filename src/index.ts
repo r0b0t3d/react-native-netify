@@ -4,7 +4,7 @@ import { NativeModules } from 'react-native';
 const { Netify } = NativeModules;
 
 const defaultConfig: Config = {
-  timeout: 60,
+  timeout: 60000, // 60s
 };
 
 function init(params?: Config) {
