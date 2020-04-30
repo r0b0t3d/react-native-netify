@@ -2,7 +2,6 @@
 
 #import <AFNetworking/AFNetworking.h>
 #import <React/RCTConvert.h>
-#import "RCTConvert+NetifyMethod.m"
 
 @interface NetifyJSONRequestSerializer : AFJSONRequestSerializer
 
