@@ -175,6 +175,10 @@ public class NetifyModule extends ReactContextBaseJavaModule {
                 map.putInt(key, (Integer) value);
             } else if (value instanceof Double) {
                 map.putDouble(key, (Double) value);
+            } else if (value instanceof Float) {
+                map.putDouble(key, ((Float) value).doubleValue());
+            } else if (value instanceof Long) {
+                map.putDouble(key, ((Long) value).doubleValue());
             } else if (value instanceof String) {
                 map.putString(key, (String) value);
             } else {
@@ -199,6 +203,10 @@ public class NetifyModule extends ReactContextBaseJavaModule {
                 array.pushInt((Integer) value);
             } else if (value instanceof Double) {
                 array.pushDouble((Double) value);
+            } else if (value instanceof Float) {
+                array.pushDouble(((Float) value).doubleValue());
+            } else if (value instanceof Long) {
+                array.pushDouble(((Long) value).doubleValue());
             } else if (value instanceof String) {
                 array.pushString((String) value);
             } else {
