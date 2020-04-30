@@ -1,8 +1,12 @@
 package com.tl.netify;
 
+import android.util.Log;
+
 import com.androidnetworking.AndroidNetworking;
+import com.androidnetworking.common.Method;
 import com.androidnetworking.error.ANError;
 import com.androidnetworking.interfaces.JSONObjectRequestListener;
+import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
 import com.facebook.react.bridge.ReactContextBaseJavaModule;
@@ -24,7 +28,9 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
+import okhttp3.Headers;
 import okhttp3.OkHttpClient;
+import okhttp3.Response;
 
 public class NetifyModule extends ReactContextBaseJavaModule {
     private final ReactApplicationContext reactContext;
@@ -41,11 +47,9 @@ public class NetifyModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void init(ReadableMap params) {
-        int timeout = params.hasKey("timeout") ? params.getInt("timeout") : 60;
+        int timeout = params.hasKey("timeout") ? params.getInt("timeout") : 60000;
         OkHttpClient okHttpClient = new OkHttpClient().newBuilder()
-                .connectTimeout(timeout, TimeUnit.SECONDS)
-                .readTimeout(timeout, TimeUnit.SECONDS)
-                .writeTimeout(timeout, TimeUnit.SECONDS)
+                .callTimeout(timeout / 1000, TimeUnit.SECONDS)
                 .build();
         AndroidNetworking.initialize(reactContext.getApplicationContext(), okHttpClient);
     }
@@ -54,7 +58,7 @@ public class NetifyModule extends ReactContextBaseJavaModule {
     public void jsonRequest(ReadableMap params, final Promise promise) {
         String url = params.getString("url");
         String methodString = params.hasKey("method") ? params.getString("method") : "get";
-        NetifyMethod method = NetifyMethod.valueOf(methodString.toUpperCase());
+        int method = methodMapper(methodString);
         ReadableMap headersMap = params.hasKey("headers") ? params.getMap("headers") : null;
         Map<String, String> headers = convertMap(headersMap);
         ReadableMap bodyMap = params.hasKey("body") ? params.getMap("body") : null;
@@ -62,45 +66,20 @@ public class NetifyModule extends ReactContextBaseJavaModule {
         if (bodyMap != null) {
             body = convertMap(bodyMap);
         }
-        switch (method) {
-            case GET:
-                AndroidNetworking.get(url)
-                        .addHeaders(headers)
-                        .build()
-                        .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
-                break;
-            case POST:
-                AndroidNetworking.post(url)
-                        .addHeaders(headers)
-                        .addBodyParameter(body)
-                        .build()
-                        .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
-                break;
-            case PUT:
-                AndroidNetworking.put(url)
-                        .addHeaders(headers)
-                        .addBodyParameter(body)
-                        .build()
-                        .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
-                break;
-            case PATCH:
-                AndroidNetworking.patch(url)
-                        .addHeaders(headers)
-                        .addBodyParameter(body)
-                        .build()
-                        .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
-                break;
-            case DELETE:
-                AndroidNetworking.delete(url)
-                        .addHeaders(headers)
-                        .addBodyParameter(body)
-                        .build()
-                        .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
-                break;
-            default:
-                break;
+        AndroidNetworking.request(url, method)
+                .addHeaders(headers)
+                .addBodyParameter(body)
+                .build()
+                .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
+    }
 
-        }
+    private int methodMapper(String method) {
+        if (method.equals("get")) return Method.GET;
+        if (method.equals("post")) return Method.POST;
+        if (method.equals("put")) return Method.PUT;
+        if (method.equals("patch")) return Method.PATCH;
+        if (method.equals("delete")) return Method.DELETE;
+        return Method.GET;
     }
 
     private static class NetifyJSONObjectRequestListener implements JSONObjectRequestListener {
@@ -121,7 +100,47 @@ public class NetifyModule extends ReactContextBaseJavaModule {
 
         @Override
         public void onError(ANError anError) {
-            promise.reject(anError);
+            WritableMap userInfo = Arguments.createMap();
+            WritableMap headers = Arguments.createMap();
+            WritableMap response = null;
+            String code = anError.getErrorDetail();
+            String message = anError.getCause().getMessage();
+            if (message.startsWith("java.net.SocketTimeoutException")) {
+                code = "timeout";
+            } else if (message.startsWith("java.net.ConnectException")) {
+                code = "network_error";
+            }
+            if (anError.getErrorCode() > 0) {
+                response = Arguments.createMap();
+                response.putInt("status", anError.getErrorCode());
+            }
+            if (anError.getResponse() != null) {
+                Headers responseHeaders = anError.getResponse().headers();
+                for (String headerName: responseHeaders.names()) {
+                    headers.putString(headerName, responseHeaders.get(headerName));
+                }
+                if (response == null) {
+                    response = Arguments.createMap();
+                }
+                response.putMap("headers", headers);
+            }
+
+            if (anError.getErrorBody() != null) {
+                try {
+                    JSONObject obj = new JSONObject();
+                    WritableMap data = convertJsonToMap(obj);
+                    if (response == null) {
+                        response = Arguments.createMap();
+                    }
+                    response.putMap("data", data);
+                } catch (Throwable t) {
+                    Log.e("Netify", "Could not parse malformed JSON: \"" + anError.getErrorBody() + "\"");
+                }
+            }
+            if (response != null) {
+                userInfo.putMap("response", response);
+            }
+            promise.reject(code, message, anError, userInfo);
         }
     }
 

@@ -19,13 +19,25 @@ async function jsonRequest(params: JsonRequestParams) {
   try {
     let { url } = params;
     url = url.replace(/([^:])(\/\/+)/g, '$1/');
-    return Netify.jsonRequest({ ...params, url });
+    const response = await Netify.jsonRequest({ ...params, url });
+    return response;
   } catch (error) {
     if (isIos) {
       handleIosError(error);
     }
+    handleAndroidError(error);
+  }
+}
+
+function handleAndroidError(error: any) {
+  console.log('Error', JSON.stringify(error));
+  const { code, userInfo } = error;
+  if (userInfo) {
+    const { response } = userInfo;
+    error.response = response;
     throw error;
   }
+  throw error;
 }
 
 function handleIosError(error: any) {
