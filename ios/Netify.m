@@ -116,7 +116,7 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
     id response = error.userInfo[AFNetworkingOperationFailingURLResponseDataErrorKey];
     NSDictionary *json;
     if (response) {
-      [NSJSONSerialization JSONObjectWithData:response
+      json = [NSJSONSerialization JSONObjectWithData:response
                                       options:NSJSONReadingAllowFragments
                                         error:nil];
     }
