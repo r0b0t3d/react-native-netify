@@ -136,4 +136,53 @@ RCT_EXPORT_METHOD(jsonRequest:(NSDictionary *)params
   reject(code, message, error);
 }
 
+- (void)upload:(NSDictionary*)params {
+  NSString* url = [RCTConvert NSString:params[@"url"]];
+  NSArray* formData = [RCTConvert NSArray:params[@"formData"]];
+  NSString* method = [RCTConvert NSString:params[@"method"]];
+  NSDictionary* headers = [RCTConvert NSDictionary:params[@"headers"]];
+  NSError *error;
+  NSMutableURLRequest *request = [[AFHTTPRequestSerializer serializer] multipartFormRequestWithMethod:method URLString:url parameters:nil constructingBodyWithBlock:^(id<AFMultipartFormData> afFormData) {
+    for (NSDictionary* data in formData) {
+      NSString* name = data[@"name"];
+      if ([name isEqualToString:@"file"]) {
+        NSString* filePath = data[@"data"];
+        NSInputStream *fileInputStream = [[NSInputStream alloc] initWithFileAtPath:filePath];
+        unsigned long long fileSize = [[[NSFileManager defaultManager] attributesOfItemAtPath:filePath error:nil] fileSize];
+        [afFormData appendPartWithInputStream:fileInputStream name:name fileName:@"" length:fileSize mimeType:@""];
+      } else {
+        [afFormData appendPartWithFormData:data[@"data"] name:name];
+      }
+    }
+  } error:&error];
+  
+  if (error) {
+    NSLog(@"Error creating multipart form upload request: %@", [error userInfo]);
+  }
+  
+  [request setAllHTTPHeaderFields:headers];
+  
+  AFURLSessionManager *manager = [[AFURLSessionManager alloc] initWithSessionConfiguration:[NSURLSessionConfiguration defaultSessionConfiguration]];
+  
+  NSURLSessionUploadTask *uploadTask;
+  uploadTask = [manager uploadTaskWithStreamedRequest:request
+                                             progress:^(NSProgress * _Nonnull uploadProgress) {
+    // This is not called back on the main queue.
+    // You are responsible for dispatching to the main queue for UI updates
+    
+    NSLog(@"Cloud Upload Completion: %f", uploadProgress.fractionCompleted);
+  }
+                                    completionHandler:^(NSURLResponse * _Nonnull response, id  _Nullable responseObject, NSError * _Nullable error) {
+    
+    if (error) {
+      NSLog(@"Error: %@", [error userInfo]);
+      
+    } else {
+      NSLog(@"Success: %@ %@", response, responseObject);
+    }
+  }];
+  
+  [uploadTask resume];
+}
+
 @end

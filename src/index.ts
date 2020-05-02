@@ -31,7 +31,14 @@ async function jsonRequest(params: JsonRequestParams) {
   }
 }
 
+async function upload(params: UploadParams) {
+  let { url } = params;
+  url = url.replace(/([^:])(\/\/+)/g, '$1/');
+  return Netify.upload({ ...params, url });
+}
+
 export default {
   init,
   jsonRequest,
+  upload,
 };
