@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
-import { NativeModules } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 const { Netify } = NativeModules;
 
@@ -16,9 +16,12 @@ function init(params?: Config) {
 
 async function jsonRequest(params: JsonRequestParams) {
   try {
-    let { url } = params;
+    let { url, body } = params;
     url = url.replace(/([^:])(\/\/+)/g, '$1/');
-    const response = await Netify.jsonRequest({ ...params, url });
+    if (body && Platform.OS === 'android') {
+      body = JSON.stringify(body);
+    }
+    const response = await Netify.jsonRequest({ ...params, url, body });
     return response;
   } catch (error) {
     const { userInfo } = error;

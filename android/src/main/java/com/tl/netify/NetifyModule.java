@@ -3,9 +3,11 @@ package com.tl.netify;
 import android.util.Log;
 
 import com.androidnetworking.AndroidNetworking;
+import com.androidnetworking.common.ANRequest;
 import com.androidnetworking.common.Method;
 import com.androidnetworking.error.ANError;
 import com.androidnetworking.interfaces.JSONObjectRequestListener;
+import com.androidnetworking.utils.ParseUtil;
 import com.facebook.react.bridge.Arguments;
 import com.facebook.react.bridge.Promise;
 import com.facebook.react.bridge.ReactApplicationContext;
@@ -18,6 +20,8 @@ import com.facebook.react.bridge.WritableArray;
 import com.facebook.react.bridge.WritableMap;
 import com.facebook.react.bridge.WritableNativeArray;
 import com.facebook.react.bridge.WritableNativeMap;
+import com.google.gson.Gson;
+import com.google.gson.internal.ObjectConstructor;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -30,6 +34,7 @@ import java.util.concurrent.TimeUnit;
 
 import okhttp3.Headers;
 import okhttp3.OkHttpClient;
+import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class NetifyModule extends ReactContextBaseJavaModule {
@@ -61,14 +66,11 @@ public class NetifyModule extends ReactContextBaseJavaModule {
         int method = methodMapper(methodString);
         ReadableMap headersMap = params.hasKey("headers") ? params.getMap("headers") : null;
         Map<String, String> headers = convertMap(headersMap);
-        ReadableMap bodyMap = params.hasKey("body") ? params.getMap("body") : null;
-        Map<String, String> body = null;
-        if (bodyMap != null) {
-            body = convertMap(bodyMap);
-        }
+        String body = params.hasKey("body") ? params.getString("body") : null;
         AndroidNetworking.request(url, method)
                 .addHeaders(headers)
-                .addBodyParameter(body)
+                .addStringBody(body)
+                .setContentType("application/json; charset=utf-8")
                 .build()
                 .getAsJSONObject(new NetifyJSONObjectRequestListener(promise));
     }
@@ -150,9 +152,8 @@ public class NetifyModule extends ReactContextBaseJavaModule {
             Iterator<Map.Entry<String, Object>> it = readableMap.getEntryIterator();
             while (it.hasNext()) {
                 Map.Entry<String, Object> pair = it.next();
-                if (pair.getValue() instanceof String) {
-                    map.put(pair.getKey(), (String) pair.getValue());
-                }
+                Object value = pair.getValue();
+                map.put(pair.getKey(), value.toString());
             }
         }
         return map;
