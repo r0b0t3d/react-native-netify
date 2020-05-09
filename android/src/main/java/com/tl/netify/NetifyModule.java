@@ -106,7 +106,13 @@ public class NetifyModule extends ReactContextBaseJavaModule {
             WritableMap headers = Arguments.createMap();
             WritableMap response = null;
             String code = anError.getErrorDetail();
-            String message = anError.getCause().getMessage();
+            String message = anError.getErrorDetail();
+            if (anError.getCause() != null) {
+                message = anError.getCause().getMessage();
+            }
+            if (message == null) {
+                message = "Unknown error";
+            }
             if (message.startsWith("java.net.SocketTimeoutException")) {
                 code = "timeout";
             } else if (message.startsWith("java.net.ConnectException")) {
@@ -128,15 +134,16 @@ public class NetifyModule extends ReactContextBaseJavaModule {
             }
 
             if (anError.getErrorBody() != null) {
+                if (response == null) {
+                    response = Arguments.createMap();
+                }
                 try {
-                    JSONObject obj = new JSONObject();
+                    JSONObject obj = new JSONObject(anError.getErrorBody());
                     WritableMap data = convertJsonToMap(obj);
-                    if (response == null) {
-                        response = Arguments.createMap();
-                    }
                     response.putMap("data", data);
                 } catch (Throwable t) {
                     Log.e("Netify", "Could not parse malformed JSON: \"" + anError.getErrorBody() + "\"");
+                    response.putString("data", anError.getErrorBody());
                 }
             }
             if (response != null) {

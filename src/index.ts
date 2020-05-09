@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-use-before-define */
 import { NativeModules, Platform } from 'react-native';
+import { Config, JsonRequestParams, UploadParams } from './types';
 
 const { Netify } = NativeModules;
 
@@ -38,3 +39,5 @@ export default {
   init,
   jsonRequest,
 };
+
+export * from './types';
